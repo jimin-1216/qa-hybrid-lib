@@ -1,0 +1,44 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'INPUT=$(cat); CMD=$(echo \"$INPUT\" | jq -r \".tool_input.command // empty\"); if echo \"$CMD\" | grep -qE \"rm\\s+-rf\\s+/|git\\s+push\\s+.*--force|git\\s+push\\s+.*-f\\s|git\\s+reset\\s+--hard|DROP\\s+TABLE|drop\\s+database\"; then echo \"BLOCKED: 위험한 명령어가 감지되었습니다. 실행 전 확인이 필요합니다: $CMD\" >&2; exit 2; fi; if echo \"$CMD\" | grep -qE \"--update-snapshots\"; then echo \"BLOCKED: 스냅샷 덮어쓰기(--update-snapshots)가 감지되었습니다. 명시적 승인 없이 스냅샷을 갱신할 수 없습니다.\" >&2; exit 2; fi'"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'INPUT=$(cat); FILE=$(echo \"$INPUT\" | jq -r \".tool_input.file_path // .tool_input.filePath // empty\"); if echo \"$FILE\" | grep -qE \"\\.(spec|test)\\.ts$\"; then echo \"[테스트 코드 품질 리마인더] $FILE 수정됨 — waitForTimeout 사용 여부를 확인하세요(가능하면 waitForSelector/waitForLoadState 사용 권장). 적절한 assertion이 포함되어 있는지, 태그 어노테이션(@smoke, @regression 등)이 올바르게 설정되어 있는지 점검하세요.\"; fi; if echo \"$FILE\" | grep -qE \"src/core/.*\\.ts$\"; then echo \"[코어 레이어 보호 리마인더] $FILE 은 불변(immutable) 코어 레이어에 속합니다. 앱 특화 로직이 포함되지 않았는지 반드시 확인하세요.\"; fi'",
+            "async": true
+          },
+          {
+            "type": "command",
+            "command": "bash -c 'INPUT=$(cat); FILE=$(echo \"$INPUT\" | jq -r \".tool_input.file_path // .tool_input.filePath // empty\"); if echo \"$FILE\" | grep -qE \"fixtures/|\\.(fixture)\\..*$\"; then echo \"[픽스처 보안 경고] $FILE 이 수정되었습니다. 실제 자격증명(credentials), API 키, 토큰 등이 포함되어 있지 않은지 반드시 확인하세요.\"; fi'",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'echo \"[세션 완료] 푸시 전에 npx playwright test --list 명령어로 테스트 디스커버리를 확인하세요.\"'",
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}
